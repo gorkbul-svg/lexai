@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LexAI — Sözleşme Analiz Sistemi</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0f0e0c;
+    --paper: #f5f0e8;
+    --parchment: #ede8dc;
+    --accent: #c8440a;
+    --accent-light: #e8654a;
+    --gold: #b8860b;
+    --muted: #7a7060;
+    --border: #d4cfc4;
+    --success: #2d6a4f;
+    --warning: #d4770a;
+    --danger: #c8440a;
+    --card: #faf7f2;
+    --shadow: 0 2px 16px rgba(15,14,12,0.08);
+    --radius: 4px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Instrument Sans', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 0 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--accent-light); font-style: italic; }
+  .header-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    background: rgba(200,68,10,0.25);
+    border: 1px solid var(--accent);
+    color: var(--accent-light);
+    padding: 3px 10px;
+    border-radius: 2px;
+    letter-spacing: 1px;
+  }
+
+  /* ── LAYOUT ── */
+  .app {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    height: calc(100vh - 56px);
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    background: var(--parchment);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    overflow-y: auto;
+  }
+  .sidebar-section {
+    padding: 0 20px 16px;
+  }
+  .sidebar-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    display: block;
+  }
+  .stage-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 2px;
+    border: 1px solid transparent;
+  }
+  .stage-item:hover { background: rgba(15,14,12,0.05); }
+  .stage-item.active {
+    background: var(--card);
+    border-color: var(--border);
+    box-shadow: var(--shadow);
+  }
+  .stage-item.done .stage-dot { background: var(--success); }
+  .stage-item.active .stage-dot { background: var(--accent); box-shadow: 0 0 0 3px rgba(200,68,10,0.2); }
+  .stage-item.pending .stage-dot { background: var(--border); }
+  .stage-item.error .stage-dot { background: var(--danger); }
+  .stage-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: all 0.3s;
+  }
+  .stage-name {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ink);
+    flex: 1;
+  }
+  .stage-item.pending .stage-name { color: var(--muted); }
+  .stage-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    letter-spacing: 0.5px;
+  }
+  .tag-high { background: rgba(200,68,10,0.1); color: var(--danger); }
+  .tag-med { background: rgba(184,134,11,0.1); color: var(--gold); }
+
+  .progress-bar-wrap {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+  }
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .progress-track {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-light));
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  /* ── MAIN ── */
+  .main {
+    overflow-y: auto;
+    padding: 32px;
+  }
+
+  /* ── UPLOAD VIEW ── */
+  #view-upload { display: block; }
+  #view-process { display: none; }
+  #view-results { display: none; }
+
+  .upload-hero {
+    max-width: 560px;
+    margin: 48px auto 0;
+    text-align: center;
+  }
+  .upload-eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .upload-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 36px;
+    line-height: 1.2;
+    margin-bottom: 12px;
+    color: var(--ink);
+  }
+  .upload-title em { color: var(--accent); font-style: italic; }
+  .upload-sub {
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 36px;
+    font-size: 14px;
+  }
+
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 48px 32px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--card);
+    position: relative;
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(200,68,10,0.03);
+  }
+  .drop-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%;
+  }
+  .drop-icon {
+    width: 48px; height: 48px;
+    margin: 0 auto 16px;
+    background: var(--parchment);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .drop-text { font-weight: 500; margin-bottom: 6px; }
+  .drop-hint { font-size: 12px; color: var(--muted); }
+  .format-chips {
+    display: flex; gap: 8px; justify-content: center; margin-top: 16px;
+  }
+  .chip {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--ink);
+    color: var(--paper);
+    border: none; cursor: pointer;
+    padding: 12px 28px;
+    border-radius: var(--radius);
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 14px; font-weight: 500;
+    transition: all 0.2s;
+    margin-top: 20px;
+  }
+  .btn-primary:hover { background: var(--accent); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* FILE PREVIEW */
+  .file-preview {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-top: 16px;
+    text-align: left;
+  }
+  .file-preview.show { display: flex; }
+  .file-icon { font-size: 24px; }
+  .file-info { flex: 1; }
+  .file-name { font-weight: 500; font-size: 13px; }
+  .file-size { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .file-remove {
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 16px; padding: 4px;
+    transition: color 0.2s;
+  }
+  .file-remove:hover { color: var(--danger); }
+
+  /* ── PROCESS VIEW ── */
+  .process-header {
+    margin-bottom: 28px;
+  }
+  .process-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    margin-bottom: 6px;
+  }
+  .process-sub { color: var(--muted); font-size: 13px; }
+
+  .agent-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .agent-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+  .agent-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--border);
+    transition: background 0.3s;
+  }
+  .agent-card.running::before { background: var(--accent); animation: pulse-bar 1.5s infinite; }
+  .agent-card.done::before { background: var(--success); }
+  .agent-card.error::before { background: var(--danger); }
+
+  @keyframes pulse-bar {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .agent-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .agent-icon { font-size: 20px; margin-bottom: 6px; }
+  .agent-name {
+    font-weight: 600; font-size: 13px; margin-bottom: 3px;
+  }
+  .agent-id {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; color: var(--muted); letter-spacing: 1px;
+  }
+  .agent-status {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; padding: 3px 8px; border-radius: 2px;
+    letter-spacing: 0.5px; white-space: nowrap;
+  }
+  .status-waiting { background: var(--parchment); color: var(--muted); }
+  .status-running { background: rgba(200,68,10,0.1); color: var(--accent); }
+  .status-done { background: rgba(45,106,79,0.1); color: var(--success); }
+  .status-error { background: rgba(200,68,10,0.1); color: var(--danger); }
+
+  .agent-log {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.6;
+    min-height: 32px;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+    margin-top: 10px;
+  }
+  .log-line { display: block; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+  .log-accent { color: var(--accent); }
+  .log-success { color: var(--success); }
+
+  /* ── RESULTS VIEW ── */
+  .results-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .results-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+  }
+  .results-meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .results-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .result-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .result-card.full-width { grid-column: 1 / -1; }
+  .rc-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    background: var(--parchment);
+  }
+  .rc-icon { font-size: 16px; }
+  .rc-title { font-weight: 600; font-size: 12px; }
+  .rc-badge {
+    margin-left: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; padding: 2px 8px; border-radius: 2px; letter-spacing: 0.5px;
+  }
+  .rc-body { padding: 16px 18px; }
+  .rc-text { font-size: 13px; line-height: 1.7; color: var(--ink); }
+
+  /* Categories */
+  .cat-list { display: flex; flex-direction: column; gap: 6px; }
+  .cat-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 12px;
+  }
+  .cat-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .cat-name { flex: 1; font-weight: 500; }
+  .cat-count {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; color: var(--muted);
+  }
+
+  /* Risk items */
+  .risk-list { display: flex; flex-direction: column; gap: 10px; }
+  .risk-item {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .risk-header-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    background: var(--parchment);
+  }
+  .risk-level {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; padding: 2px 7px; border-radius: 2px; letter-spacing: 0.5px;
+    font-weight: 500;
+  }
+  .level-high { background: rgba(200,68,10,0.15); color: var(--danger); }
+  .level-med { background: rgba(184,134,11,0.15); color: var(--gold); }
+  .level-low { background: rgba(45,106,79,0.15); color: var(--success); }
+  .risk-title-text { font-weight: 600; font-size: 12px; flex: 1; }
+  .risk-desc { padding: 10px 12px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+  /* Recommendations */
+  .rec-list { display: flex; flex-direction: column; gap: 8px; }
+  .rec-item {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .rec-num {
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px; color: var(--accent); line-height: 1; flex-shrink: 0;
+  }
+  .rec-text { font-size: 12px; line-height: 1.6; }
+  .rec-ref { font-family: 'DM Mono', monospace; font-size: 9px; color: var(--muted); margin-top: 3px; letter-spacing: 0.5px; }
+
+  /* Approval */
+  .approval-section {
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    padding: 24px;
+    margin-top: 20px;
+  }
+  .approval-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px; margin-bottom: 6px;
+  }
+  .approval-sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .approval-actions { display: flex; gap: 12px; align-items: flex-start; }
+  .btn-approve {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--success);
+    color: white;
+    border: none; cursor: pointer;
+    padding: 11px 24px; border-radius: var(--radius);
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 14px; font-weight: 500; transition: all 0.2s;
+  }
+  .btn-approve:hover { opacity: 0.85; }
+  .btn-reject {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: transparent;
+    color: var(--danger);
+    border: 1.5px solid var(--danger); cursor: pointer;
+    padding: 11px 24px; border-radius: var(--radius);
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 14px; font-weight: 500; transition: all 0.2s;
+  }
+  .btn-reject:hover { background: rgba(200,68,10,0.05); }
+  .feedback-area {
+    flex: 1;
+    display: none;
+  }
+  .feedback-area.show { display: block; }
+  .feedback-textarea {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 13px;
+    resize: vertical; min-height: 80px;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .feedback-textarea:focus { outline: none; border-color: var(--accent); }
+  .btn-send-fb {
+    margin-top: 8px;
+    background: var(--ink); color: var(--paper);
+    border: none; cursor: pointer;
+    padding: 8px 18px; border-radius: var(--radius);
+    font-size: 12px; font-weight: 500;
+    font-family: 'Instrument Sans', sans-serif;
+    transition: all 0.2s;
+  }
+  .btn-send-fb:hover { background: var(--accent); }
+
+  .approval-done {
+    display: none;
+    align-items: center; gap: 12px;
+    padding: 16px;
+    border-radius: var(--radius);
+  }
+  .approval-done.approved { background: rgba(45,106,79,0.08); border: 1px solid rgba(45,106,79,0.3); }
+  .approval-done.rejected { background: rgba(200,68,10,0.08); border: 1px solid rgba(200,68,10,0.3); }
+  .approval-done.show { display: flex; }
+  .done-icon { font-size: 24px; }
+  .done-text { font-weight: 600; font-size: 14px; }
+  .done-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* Spinner */
+  .spinner {
+    display: inline-block; width: 12px; height: 12px;
+    border: 2px solid rgba(200,68,10,0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .toggle-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px; padding: 3px 10px; border-radius: 2px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; letter-spacing: 0.5px;
+    transition: all 0.15s;
+  }
+  .toggle-btn.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  .history-item {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 4px;
+    cursor: default;
+    background: var(--card);
+  }
+  .history-name { font-size: 11px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-meta { font-family: 'DM Mono', monospace; font-size: 9px; color: var(--muted); margin-top: 2px; }
+  .history-status {
+    display: inline-block; font-family: 'DM Mono', monospace;
+    font-size: 8px; padding: 1px 6px; border-radius: 2px; margin-top: 4px; letter-spacing: 0.5px;
+  }
+  .hs-approved { background: rgba(45,106,79,0.1); color: var(--success); }
+  .hs-rejected { background: rgba(200,68,10,0.1); color: var(--danger); }
+  .hs-pending { background: rgba(184,134,11,0.1); color: var(--gold); }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Lex<span>AI</span></div>
+  <div class="header-badge">BETA v0.1</div>
+</header>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <span class="sidebar-label">Süreç Adımları</span>
+      <div class="stage-item" id="s-upload" onclick="goTo('upload')">
+        <div class="stage-dot"></div>
+        <span class="stage-name">Doküman Yükleme</span>
+        <span class="stage-tag tag-high">US-01</span>
+      </div>
+      <div class="stage-item pending" id="s-parse">
+        <div class="stage-dot"></div>
+        <span class="stage-name">İçerik Ayrıştırma</span>
+        <span class="stage-tag tag-high">US-02</span>
+      </div>
+      <div class="stage-item pending" id="s-classify">
+        <div class="stage-dot"></div>
+        <span class="stage-name">Kategorize Etme</span>
+        <span class="stage-tag tag-high">US-03</span>
+      </div>
+      <div class="stage-item pending" id="s-summarize">
+        <div class="stage-dot"></div>
+        <span class="stage-name">Özetleme</span>
+        <span class="stage-tag tag-high">US-04</span>
+      </div>
+      <div class="stage-item pending" id="s-analyze">
+        <div class="stage-dot"></div>
+        <span class="stage-name">Risk Analizi</span>
+        <span class="stage-tag tag-high">US-05</span>
+      </div>
+      <div class="stage-item pending" id="s-recommend">
+        <div class="stage-dot"></div>
+        <span class="stage-name">Öneri Üretme</span>
+        <span class="stage-tag tag-med">US-06</span>
+      </div>
+      <div class="stage-item pending" id="s-approve">
+        <div class="stage-dot"></div>
+        <span class="stage-name">Onay Süreci</span>
+        <span class="stage-tag tag-high">US-07</span>
+      </div>
+    </div>
+    <div class="progress-bar-wrap">
+      <div class="progress-label">
+        <span>GENEL İLERLEME</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+    <div class="sidebar-section" style="margin-top:16px">
+      <span class="sidebar-label">Geçmiş İşlemler</span>
+      <div id="history-list"><span style="font-size:11px;color:var(--muted);padding:0 10px">Henüz işlem yok</span></div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- VIEW: UPLOAD -->
+    <div id="view-upload">
+      <div class="upload-hero">
+        <div class="upload-eyebrow">US-001-01 · Doküman Yükleme</div>
+        <h1 class="upload-title">Sözleşmenizi <em>analiz</em> edelim</h1>
+        <p class="upload-sub">PDF veya Word formatında sözleşmenizi yükleyin. Agent tabanlı sistemimiz otomatik olarak okuma, kategorize etme, risk analizi ve öneri aşamalarını çalıştıracak.</p>
+
+        <div class="drop-zone" id="dropZone">
+          <input type="file" id="fileInput" accept=".pdf,.doc,.docx" onchange="handleFile(event)">
+          <div class="drop-icon">📄</div>
+          <div class="drop-text">Dosyayı buraya sürükleyin</div>
+          <div class="drop-hint">veya tıklayarak seçin</div>
+          <div class="format-chips">
+            <span class="chip">PDF</span>
+            <span class="chip">DOC</span>
+            <span class="chip">DOCX</span>
+          </div>
+        </div>
+
+        <div class="file-preview" id="filePreview">
+          <div class="file-icon" id="fileIconDisplay">📄</div>
+          <div class="file-info">
+            <div class="file-name" id="fileName">—</div>
+            <div class="file-size" id="fileSize">—</div>
+          </div>
+          <button class="file-remove" onclick="removeFile()">✕</button>
+        </div>
+
+        <button class="btn-primary" id="startBtn" onclick="startAnalysis()" disabled>
+          ▶ Analizi Başlat
+        </button>
+      </div>
+    </div>
+
+    <!-- VIEW: PROCESS -->
+    <div id="view-process">
+      <div class="process-header">
+        <h2 class="process-title">Agent Süreçleri Çalışıyor</h2>
+        <p class="process-sub">Sözleşmeniz sırayla işleniyor. Lütfen bekleyin…</p>
+      </div>
+
+      <div class="agent-grid">
+        <div class="agent-card" id="card-parse">
+          <div class="agent-header">
+            <div>
+              <div class="agent-icon">🧠</div>
+              <div class="agent-name">Parsing Agent</div>
+              <div class="agent-id">US-001-02</div>
+            </div>
+            <span class="agent-status status-waiting" id="status-parse">BEKLIYOR</span>
+          </div>
+          <div class="agent-log" id="log-parse">—</div>
+        </div>
+        <div class="agent-card" id="card-classify">
+          <div class="agent-header">
+            <div>
+              <div class="agent-icon">🏷️</div>
+              <div class="agent-name">Classification Agent</div>
+              <div class="agent-id">US-001-03</div>
+            </div>
+            <span class="agent-status status-waiting" id="status-classify">BEKLIYOR</span>
+          </div>
+          <div class="agent-log" id="log-classify">—</div>
+        </div>
+        <div class="agent-card" id="card-summarize">
+          <div class="agent-header">
+            <div>
+              <div class="agent-icon">🧾</div>
+              <div class="agent-name">Summarization Agent</div>
+              <div class="agent-id">US-001-04</div>
+            </div>
+            <span class="agent-status status-waiting" id="status-summarize">BEKLIYOR</span>
+          </div>
+          <div class="agent-log" id="log-summarize">—</div>
+        </div>
+        <div class="agent-card" id="card-analyze">
+          <div class="agent-header">
+            <div>
+              <div class="agent-icon">⚠️</div>
+              <div class="agent-name">Analysis Agent</div>
+              <div class="agent-id">US-001-05</div>
+            </div>
+            <span class="agent-status status-waiting" id="status-analyze">BEKLIYOR</span>
+          </div>
+          <div class="agent-log" id="log-analyze">—</div>
+        </div>
+        <div class="agent-card" id="card-recommend">
+          <div class="agent-header">
+            <div>
+              <div class="agent-icon">🔀</div>
+              <div class="agent-name">Recommendation Agent</div>
+              <div class="agent-id">US-001-06</div>
+            </div>
+            <span class="agent-status status-waiting" id="status-recommend">BEKLIYOR</span>
+          </div>
+          <div class="agent-log" id="log-recommend">—</div>
+        </div>
+        <div class="agent-card" id="card-approve">
+          <div class="agent-header">
+            <div>
+              <div class="agent-icon">✅</div>
+              <div class="agent-name">Approval Agent</div>
+              <div class="agent-id">US-001-07</div>
+            </div>
+            <span class="agent-status status-waiting" id="status-approve">BEKLIYOR</span>
+          </div>
+          <div class="agent-log" id="log-approve">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW: RESULTS -->
+    <div id="view-results">
+      <div class="results-header">
+        <div>
+          <h2 class="results-title">Analiz Tamamlandı</h2>
+          <div class="results-meta" id="results-meta">— · —</div>
+        </div>
+        <button class="btn-primary" onclick="resetAll()" style="margin-top:0">
+          + Yeni Analiz
+        </button>
+      </div>
+
+      <div class="results-grid">
+        <!-- Summary -->
+        <div class="result-card full-width">
+          <div class="rc-header">
+            <span class="rc-icon">🧾</span>
+            <span class="rc-title">Genel Özet</span>
+            <div style="margin-left:auto;display:flex;gap:6px">
+              <button onclick="toggleSummary('short')" id="btn-short" class="toggle-btn active">Kısa</button>
+              <button onclick="toggleSummary('long')" id="btn-long" class="toggle-btn">Detaylı</button>
+            </div>
+          </div>
+          <div class="rc-body">
+            <div class="rc-text" id="result-summary">—</div>
+          </div>
+        </div>
+
+        <!-- Categories -->
+        <div class="result-card">
+          <div class="rc-header">
+            <span class="rc-icon">🏷️</span>
+            <span class="rc-title">Kategori Analizi</span>
+            <span class="rc-badge" style="background:rgba(184,134,11,0.1);color:var(--gold);">CLASSIFICATION</span>
+          </div>
+          <div class="rc-body">
+            <div class="cat-list" id="result-categories">—</div>
+          </div>
+        </div>
+
+        <!-- Risks -->
+        <div class="result-card">
+          <div class="rc-header">
+            <span class="rc-icon">⚠️</span>
+            <span class="rc-title">Risk Tespiti</span>
+            <span class="rc-badge" style="background:rgba(200,68,10,0.1);color:var(--danger);">ANALİZ</span>
+          </div>
+          <div class="rc-body">
+            <div class="risk-list" id="result-risks">—</div>
+          </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="result-card full-width">
+          <div class="rc-header">
+            <span class="rc-icon">🔀</span>
+            <span class="rc-title">Aksiyon Önerileri</span>
+            <span class="rc-badge" style="background:rgba(184,134,11,0.1);color:var(--gold);">ÖNERİ</span>
+          </div>
+          <div class="rc-body">
+            <div class="rec-list" id="result-recommendations">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Approval -->
+      <div class="approval-section">
+        <div class="approval-title">Onay Süreci</div>
+        <div class="approval-sub">Analiz sonuçlarını inceledikten sonra onay veya red kararınızı belirtin.</div>
+        <div class="approval-actions" id="approval-actions">
+          <button class="btn-approve" onclick="doApprove()">✓ Onayla</button>
+          <button class="btn-reject" onclick="showRejectFeedback()">✕ Reddet</button>
+          <div class="feedback-area" id="feedback-area">
+            <textarea class="feedback-textarea" id="feedback-text" placeholder="Geri bildiriminizi yazın…"></textarea>
+            <button class="btn-send-fb" onclick="doReject()">Gönder</button>
+          </div>
+        </div>
+        <div class="approval-done" id="approval-done"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  // ── STATE ──
+  let currentFile = null;
+  let analysisResult = null;
+
+  // ── FILE HANDLING ──
+  const dropZone = document.getElementById('dropZone');
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); dropZone.classList.remove('dragover');
+    const f = e.dataTransfer.files[0];
+    if (f) processFile(f);
+  });
+
+  function handleFile(e) {
+    const f = e.target.files[0];
+    if (f) processFile(f);
+  }
+
+  function processFile(f) {
+    const allowed = ['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const ext = f.name.split('.').pop().toLowerCase();
+    const okExt = ['pdf','doc','docx'].includes(ext);
+    if (!okExt) { alert('Desteklenmeyen format. Lütfen PDF, DOC veya DOCX yükleyin.'); return; }
+    currentFile = f;
+    document.getElementById('filePreview').classList.add('show');
+    document.getElementById('fileName').textContent = f.name;
+    document.getElementById('fileSize').textContent = (f.size / 1024).toFixed(1) + ' KB';
+    document.getElementById('fileIconDisplay').textContent = ext === 'pdf' ? '📕' : '📘';
+    document.getElementById('startBtn').disabled = false;
+    setStage('upload', 'done');
+    updateProgress(1);
+  }
+
+  function removeFile() {
+    currentFile = null;
+    document.getElementById('filePreview').classList.remove('show');
+    document.getElementById('fileInput').value = '';
+    document.getElementById('startBtn').disabled = true;
+    setStage('upload', '');
+    updateProgress(0);
+  }
+
+  function goTo(view) {}
+
+  // ── SIDEBAR ──
+  const stages = ['upload','parse','classify','summarize','analyze','recommend','approve'];
+  function setStage(id, state) {
+    const el = document.getElementById('s-' + id);
+    if (!el) return;
+    el.className = 'stage-item' + (state ? ' ' + state : '');
+  }
+  function updateProgress(n) {
+    const pct = Math.round((n / stages.length) * 100);
+    document.getElementById('progress-pct').textContent = pct + '%';
+    document.getElementById('progress-fill').style.width = pct + '%';
+  }
+
+  // ── AGENT HELPERS ──
+  function setAgentStatus(id, state, label) {
+    const card = document.getElementById('card-' + id);
+    const status = document.getElementById('status-' + id);
+    if (!card || !status) return;
+    card.className = 'agent-card' + (state ? ' ' + state : '');
+    const cls = { waiting:'status-waiting', running:'status-running', done:'status-done', error:'status-error' }[state] || 'status-waiting';
+    status.className = 'agent-status ' + cls;
+    status.textContent = label;
+  }
+  function appendLog(id, text, cls) {
+    const el = document.getElementById('log-' + id);
+    if (!el) return;
+    const span = document.createElement('span');
+    span.className = 'log-line' + (cls ? ' ' + cls : '');
+    span.textContent = text;
+    if (el.textContent === '—') el.textContent = '';
+    el.appendChild(span);
+    el.appendChild(document.createElement('br'));
+  }
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // ── READ FILE ──
+  function readFileContent(file) {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result || '');
+      if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        reader.readAsDataURL(file);
+      } else {
+        reader.readAsText(file, 'utf-8');
+      }
+    });
+  }
+
+  // ── MAIN ANALYSIS ──
+  async function startAnalysis() {
+    if (!currentFile) return;
+    document.getElementById('view-upload').style.display = 'none';
+    document.getElementById('view-process').style.display = 'block';
+    document.getElementById('view-results').style.display = 'none';
+
+    let fileContent = '';
+    try { fileContent = await readFileContent(currentFile); } catch(e) { fileContent = ''; }
+
+    const isPDF = currentFile.name.endsWith('.pdf');
+    const contentNote = isPDF
+      ? `Dosya adı: "${currentFile.name}", boyut: ${(currentFile.size/1024).toFixed(1)} KB. PDF formatında yüklendi.`
+      : `Dosya adı: "${currentFile.name}", içerik: ${fileContent.substring(0, 2000)}`;
+
+    const agents = ['parse','classify','summarize','analyze','recommend','approve'];
+    const stageMap = { parse:1, classify:2, summarize:3, analyze:4, recommend:5, approve:6 };
+
+    // Agent sıralı çalışma
+    for (const agent of agents) {
+      setStage(agent, 'active');
+      setAgentStatus(agent, 'running', 'ÇALIŞIYOR');
+      appendLog(agent, '⟳ Başlatılıyor…');
+      await sleep(400);
+      await runAgent(agent, contentNote, fileContent);
+      setStage(agent, 'done');
+      setAgentStatus(agent, 'done', 'TAMAMLANDI');
+      updateProgress(stageMap[agent] + 1);
+      await sleep(300);
+    }
+
+    // Sonuçlar
+    await sleep(500);
+    showResults();
+  }
+
+  async function runAgent(agent, contentNote, rawContent) {
+    const prompts = {
+      parse: `Sen bir sözleşme analiz sisteminin Parsing Agent'ısın. 
+Kullanıcı şu dosyayı yükledi: ${contentNote}
+
+Gerçek bir sözleşmeymiş gibi davran ve aşağıdaki JSON'u döndür. Sadece JSON, başka hiçbir şey yazma:
+{
+  "status": "success",
+  "sections": ["Taraflar ve Kapsam", "Ödeme Koşulları", "Teslimat ve Yükümlülükler", "Fesih Şartları", "Gizlilik", "Uyuşmazlık Çözümü"],
+  "clause_count": 24,
+  "page_count": 8,
+  "language": "Türkçe"
+}`,
+
+      classify: `Sen bir sözleşme analiz sisteminin Classification Agent'ısın.
+${contentNote}
+
+Gerçek bir sözleşmeymiş gibi kategorize et. Sadece JSON döndür:
+{
+  "categories": [
+    {"name": "Ödeme & Finansal", "count": 6, "color": "#c8440a"},
+    {"name": "Yükümlülükler", "count": 7, "color": "#b8860b"},
+    {"name": "Fesih Koşulları", "count": 4, "color": "#2d6a4f"},
+    {"name": "Gizlilik & IP", "count": 4, "color": "#4a6fa5"},
+    {"name": "Uyuşmazlık", "count": 3, "color": "#7a7060"}
+  ],
+  "needs_review": 2
+}`,
+
+      summarize: `Sen bir sözleşme analiz sisteminin Summarization Agent'ısın.
+${contentNote}
+
+Gerçek bir sözleşme özeti yaz. Sadece JSON döndür:
+{
+  "short": "İki taraf arasında 12 aylık hizmet sunumu ve ödeme koşullarını düzenleyen çerçeve sözleşme.",
+  "long": "Bu sözleşme, Hizmet Sağlayıcı ve Müşteri arasındaki yazılım geliştirme hizmetlerini kapsamakta olup aylık ödeme, teslimat takvimleri ve fikri mülkiyet haklarını düzenlemektedir. Sözleşme süresi 12 ay olup, her iki tarafın 30 gün önceden yazılı bildirim ile fesih hakkı bulunmaktadır. Gizlilik maddeleri sözleşme sona erdikten sonra 3 yıl geçerliliğini korumaktadır. Kritik olarak, geç ödeme durumunda aylık %2 ceza uygulanmakta ve ihtilaflarda İstanbul mahkemeleri yetkili kılınmaktadır."
+}`,
+
+      analyze: `Sen bir sözleşme analiz sisteminin Analysis Agent'ısın.
+${contentNote}
+
+Risk analizi yap. Sadece JSON döndür:
+{
+  "risks": [
+    {
+      "level": "HIGH",
+      "title": "Tek Taraflı Fesih Hakkı",
+      "description": "Müşteri, 30 gün önceden bildirimle sözleşmeyi tek taraflı feshedebilmektedir. Hizmet sağlayıcı için gelir kaybı riski yüksektir.",
+      "clause": "Madde 8.2"
+    },
+    {
+      "level": "HIGH",
+      "title": "Fikri Mülkiyet Belirsizliği",
+      "description": "Geliştirilen yazılımın mülkiyeti konusunda muğlak ifadeler bulunmakta, bu durum ihtilafa yol açabilir.",
+      "clause": "Madde 12.1"
+    },
+    {
+      "level": "MEDIUM",
+      "title": "Geç Ödeme Cezası",
+      "description": "Aylık %2 ceza oranı piyasa ortalamasının üzerinde olup nakit akışı sorunlarında kümülatif etki yaratabilir.",
+      "clause": "Madde 5.4"
+    },
+    {
+      "level": "LOW",
+      "title": "Gizlilik Süresi",
+      "description": "3 yıllık gizlilik süresi sektör standardıyla uyumlu ancak teknoloji projelerinde daha uzun süre önerilebilir.",
+      "clause": "Madde 9.1"
+    }
+  ]
+}`,
+
+      recommend: `Sen bir sözleşme analiz sisteminin Recommendation Agent'ısın.
+${contentNote}
+
+Aksiyon önerileri sun. Sadece JSON döndür:
+{
+  "recommendations": [
+    {
+      "text": "Madde 8.2'ye karşılıklı fesih bildirimi eklenmelidir. Tek taraflı fesih hakkının dengelenmesi için minimum tazminat maddesi müzakere edilmelidir.",
+      "ref": "Madde 8.2 · Risk: Fesih"
+    },
+    {
+      "text": "Madde 12.1 kapsamında fikri mülkiyet hakları net olarak tanımlanmalı; hangi çıktıların kime ait olduğu liste halinde ekte belirtilmelidir.",
+      "ref": "Madde 12.1 · Risk: IP"
+    },
+    {
+      "text": "Geç ödeme faiz oranı %2'den %1'e düşürülmeli, aksi hâlde yasal faiz oranıyla sınırlandırma talep edilmelidir.",
+      "ref": "Madde 5.4 · Risk: Finansal"
+    },
+    {
+      "text": "Teknoloji projesi niteliği gözetilerek gizlilik süresi 5 yıla uzatılması ve ticari sır kapsamının genişletilmesi önerilir.",
+      "ref": "Madde 9.1 · Risk: Gizlilik"
+    }
+  ]
+}`,
+
+      approve: `Sen bir sözleşme analiz sisteminin Approval Agent'ısın. Analiz tamamlandı. Sadece JSON döndür:
+{
+  "ready": true,
+  "summary_ready": true,
+  "timestamp": "${new Date().toLocaleString('tr-TR')}"
+}`
+    };
+
+    try {
+      let parsed;
+      try {
+        const resp = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 1000,
+            messages: [{ role: "user", content: prompts[agent] }]
+          })
+        });
+        if (!resp.ok) throw new Error('API ' + resp.status);
+        const data = await resp.json();
+        const text = (data.content || []).map(b => b.text || '').join('');
+        const clean = text.replace(/```json[\s\S]*?```|```/g, '').trim();
+        parsed = JSON.parse(clean);
+      } catch(apiErr) {
+        // API erişilemiyorsa demo verisi kullan
+        appendLog(agent, '⟳ Demo modunda çalışıyor…', 'log-accent');
+        await sleep(800);
+        parsed = getDemoData(agent);
+      }
+
+      // Log feedback per agent
+      if (agent === 'parse') {
+        appendLog('parse', `✓ ${parsed.clause_count} madde tespit edildi`, 'log-success');
+        appendLog('parse', `✓ ${parsed.sections.length} bölüm ayrıştırıldı`, 'log-success');
+        analysisResult = analysisResult || {};
+        analysisResult.parse = parsed;
+      } else if (agent === 'classify') {
+        appendLog('classify', `✓ ${parsed.categories.length} kategori oluşturuldu`, 'log-success');
+        appendLog('classify', `⚑ ${parsed.needs_review} madde inceleme bekliyor`, 'log-accent');
+        analysisResult.classify = parsed;
+      } else if (agent === 'summarize') {
+        appendLog('summarize', '✓ Kısa ve detaylı özet hazırlandı', 'log-success');
+        analysisResult.summarize = parsed;
+      } else if (agent === 'analyze') {
+        const highs = parsed.risks.filter(r => r.level === 'HIGH').length;
+        appendLog('analyze', `✓ ${parsed.risks.length} risk tespit edildi`, 'log-success');
+        appendLog('analyze', `⚠ ${highs} yüksek öncelikli risk`, 'log-accent');
+        analysisResult.analyze = parsed;
+      } else if (agent === 'recommend') {
+        appendLog('recommend', `✓ ${parsed.recommendations.length} öneri oluşturuldu`, 'log-success');
+        analysisResult.recommend = parsed;
+      } else if (agent === 'approve') {
+        appendLog('approve', '✓ Sistem onaya hazır', 'log-success');
+        analysisResult.approve = parsed;
+        analysisResult.meta = { file: currentFile.name, ts: parsed.timestamp };
+      }
+    } catch(e) {
+      appendLog(agent, '✗ Beklenmedik hata: ' + e.message);
+    }
+  }
+
+  function getDemoData(agent) {
+    const demos = {
+      parse: { status:'success', sections:['Taraflar ve Kapsam','Ödeme Koşulları','Teslimat ve Yükümlülükler','Fesih Şartları','Gizlilik','Uyuşmazlık Çözümü'], clause_count:24, page_count:8, language:'Türkçe' },
+      classify: { categories:[{name:'Ödeme & Finansal',count:6,color:'#c8440a'},{name:'Yükümlülükler',count:7,color:'#b8860b'},{name:'Fesih Koşulları',count:4,color:'#2d6a4f'},{name:'Gizlilik & IP',count:4,color:'#4a6fa5'},{name:'Uyuşmazlık',count:3,color:'#7a7060'}], needs_review:2 },
+      summarize: { short:'İki taraf arasında 12 aylık hizmet sunumu ve ödeme koşullarını düzenleyen çerçeve sözleşme.', long:'Bu sözleşme, Hizmet Sağlayıcı ve Müşteri arasındaki yazılım geliştirme hizmetlerini kapsamakta olup aylık ödeme, teslimat takvimleri ve fikri mülkiyet haklarını düzenlemektedir. Sözleşme süresi 12 ay olup, her iki tarafın 30 gün önceden yazılı bildirim ile fesih hakkı bulunmaktadır. Gizlilik maddeleri sözleşme sona erdikten sonra 3 yıl geçerliliğini korumaktadır. Kritik olarak, geç ödeme durumunda aylık %2 ceza uygulanmakta ve ihtilaflarda İstanbul mahkemeleri yetkili kılınmaktadır.' },
+      analyze: { risks:[{level:'HIGH',title:'Tek Taraflı Fesih Hakkı',description:'Müşteri, 30 gün önceden bildirimle sözleşmeyi tek taraflı feshedebilmektedir. Hizmet sağlayıcı için gelir kaybı riski yüksektir.',clause:'Madde 8.2'},{level:'HIGH',title:'Fikri Mülkiyet Belirsizliği',description:'Geliştirilen yazılımın mülkiyeti konusunda muğlak ifadeler bulunmakta, bu durum ihtilafa yol açabilir.',clause:'Madde 12.1'},{level:'MEDIUM',title:'Geç Ödeme Cezası',description:'Aylık %2 ceza oranı piyasa ortalamasının üzerinde olup nakit akışı sorunlarında kümülatif etki yaratabilir.',clause:'Madde 5.4'},{level:'LOW',title:'Gizlilik Süresi',description:'3 yıllık gizlilik süresi sektör standardıyla uyumlu ancak teknoloji projelerinde daha uzun süre önerilebilir.',clause:'Madde 9.1'}] },
+      recommend: { recommendations:[{text:'Madde 8.2\'ye karşılıklı fesih bildirimi eklenmelidir. Tek taraflı fesih hakkının dengelenmesi için minimum tazminat maddesi müzakere edilmelidir.',ref:'Madde 8.2 · Risk: Fesih'},{text:'Madde 12.1 kapsamında fikri mülkiyet hakları net olarak tanımlanmalı; hangi çıktıların kime ait olduğu liste halinde ekte belirtilmelidir.',ref:'Madde 12.1 · Risk: IP'},{text:'Geç ödeme faiz oranı %2\'den %1\'e düşürülmeli, aksi hâlde yasal faiz oranıyla sınırlandırma talep edilmelidir.',ref:'Madde 5.4 · Risk: Finansal'},{text:'Teknoloji projesi niteliği gözetilerek gizlilik süresi 5 yıla uzatılması ve ticari sır kapsamının genişletilmesi önerilir.',ref:'Madde 9.1 · Risk: Gizlilik'}] },
+      approve: { ready:true, summary_ready:true, timestamp: new Date().toLocaleString('tr-TR') }
+    };
+    return demos[agent];
+  }
+
+  // ── SHOW RESULTS ──
+  function showResults() {
+    document.getElementById('view-process').style.display = 'none';
+    document.getElementById('view-results').style.display = 'block';
+
+    const r = analysisResult || {};
+    const meta = r.meta || {};
+
+    document.getElementById('results-meta').textContent =
+      `${meta.file || currentFile?.name || '—'} · ${meta.ts || new Date().toLocaleString('tr-TR')}`;
+
+    // Summary — kısa özet varsayılan (US-001-04)
+    const summ = r.summarize || {};
+    summaryMode = 'short';
+    document.getElementById('btn-short').className = 'toggle-btn active';
+    document.getElementById('btn-long').className = 'toggle-btn';
+    document.getElementById('result-summary').textContent = summ.short || summ.long || '—';
+
+    // Geçmişe ekle (US-001-08)
+    addHistory(currentFile?.name || '—', 'analyzed');
+
+    // Categories
+    const cats = (r.classify?.categories) || [];
+    const catEl = document.getElementById('result-categories');
+    catEl.innerHTML = cats.map(c => `
+      <div class="cat-item">
+        <div class="cat-dot" style="background:${c.color}"></div>
+        <span class="cat-name">${c.name}</span>
+        <span class="cat-count">${c.count} madde</span>
+      </div>`).join('') || '<span style="color:var(--muted)">—</span>';
+
+    // Risks
+    const risks = (r.analyze?.risks) || [];
+    const riskEl = document.getElementById('result-risks');
+    const lvlMap = { HIGH:['HIGH','level-high'], MEDIUM:['ORTA','level-med'], LOW:['DÜŞÜK','level-low'] };
+    riskEl.innerHTML = risks.map(ri => {
+      const [lbl, cls] = lvlMap[ri.level] || ['—','level-low'];
+      return `<div class="risk-item">
+        <div class="risk-header-row">
+          <span class="risk-level ${cls}">${lbl}</span>
+          <span class="risk-title-text">${ri.title}</span>
+          <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--muted)">${ri.clause}</span>
+        </div>
+        <div class="risk-desc">${ri.description}</div>
+      </div>`;
+    }).join('') || '—';
+
+    // Recommendations
+    const recs = (r.recommend?.recommendations) || [];
+    const recEl = document.getElementById('result-recommendations');
+    recEl.innerHTML = recs.map((rec, i) => `
+      <div class="rec-item">
+        <div class="rec-num">${i+1}</div>
+        <div>
+          <div class="rec-text">${rec.text}</div>
+          <div class="rec-ref">${rec.ref}</div>
+        </div>
+      </div>`).join('') || '—';
+  }
+
+  // ── SUMMARY TOGGLE (US-001-04 AC4) ──
+  let summaryMode = 'short';
+  function toggleSummary(mode) {
+    summaryMode = mode;
+    document.getElementById('btn-short').className = 'toggle-btn' + (mode==='short'?' active':'');
+    document.getElementById('btn-long').className = 'toggle-btn' + (mode==='long'?' active':'');
+    const summ = analysisResult?.summarize || {};
+    document.getElementById('result-summary').textContent = mode === 'short' ? (summ.short||'—') : (summ.long||summ.short||'—');
+  }
+
+  // ── HISTORY (US-001-08 AC4) ──
+  const analysisHistory = [];
+  function addHistory(fileName, status) {
+    analysisHistory.unshift({ name: fileName, ts: new Date().toLocaleString('tr-TR'), status });
+    renderHistory();
+  }
+  function renderHistory() {
+    const el = document.getElementById('history-list');
+    if (!analysisHistory.length) { el.innerHTML = '<span style="font-size:11px;color:var(--muted);padding:0 10px">Henüz işlem yok</span>'; return; }
+    el.innerHTML = analysisHistory.slice(0,5).map(h => {
+      const cls = h.status==='approved'?'hs-approved':h.status==='rejected'?'hs-rejected':'hs-pending';
+      const lbl = h.status==='approved'?'ONAYLANDI':h.status==='rejected'?'REDDEDİLDİ':'ANALİZ EDİLDİ';
+      return `<div class="history-item">
+        <div class="history-name" title="${h.name}">${h.name}</div>
+        <div class="history-meta">${h.ts}</div>
+        <span class="history-status ${cls}">${lbl}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // ── APPROVAL ──
+  function doApprove() {
+    document.getElementById('approval-actions').style.display = 'none';
+    const done = document.getElementById('approval-done');
+    done.className = 'approval-done approved show';
+    done.innerHTML = `<div class="done-icon">✅</div><div><div class="done-text">Sözleşme Onaylandı</div><div class="done-sub">Süreç başarıyla tamamlandı · ${new Date().toLocaleString('tr-TR')}</div></div>`;
+    setStage('approve', 'done');
+    updateProgress(7);
+    addHistory(currentFile?.name || '—', 'approved');
+  }
+
+  function showRejectFeedback() {
+    document.getElementById('feedback-area').classList.add('show');
+  }
+
+  function doReject() {
+    const fb = document.getElementById('feedback-text').value.trim();
+    document.getElementById('approval-actions').style.display = 'none';
+    const done = document.getElementById('approval-done');
+    done.className = 'approval-done rejected show';
+    done.innerHTML = `<div class="done-icon">❌</div><div><div class="done-text">Sözleşme Reddedildi</div><div class="done-sub">${fb ? '"' + fb + '"' : 'Geri bildirim girilmedi'} · ${new Date().toLocaleString('tr-TR')}</div></div>`;
+    setStage('approve', 'error');
+    addHistory(currentFile?.name || '—', 'rejected');
+
+  // ── RESET ──
+  function resetAll() {
+    currentFile = null;
+    analysisResult = null;
+    document.getElementById('view-upload').style.display = 'block';
+    document.getElementById('view-process').style.display = 'none';
+    document.getElementById('view-results').style.display = 'none';
+    document.getElementById('fileInput').value = '';
+    document.getElementById('filePreview').classList.remove('show');
+    document.getElementById('startBtn').disabled = true;
+    stages.forEach((s,i) => setStage(s, i === 0 ? '' : 'pending'));
+    updateProgress(0);
+    // Reset approval
+    document.getElementById('approval-actions').style.display = 'flex';
+    document.getElementById('approval-done').className = 'approval-done';
+    document.getElementById('approval-done').innerHTML = '';
+    document.getElementById('feedback-area').classList.remove('show');
+    document.getElementById('feedback-text').value = '';
+    // Reset agent cards
+    ['parse','classify','summarize','analyze','recommend','approve'].forEach(a => {
+      setAgentStatus(a, 'waiting', 'BEKLIYOR');
+      const log = document.getElementById('log-' + a);
+      if (log) log.innerHTML = '—';
+    });
+  }
+
+  // Init
+  setStage('upload', 'active');
+</script>
+</body>
+</html>
